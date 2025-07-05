@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Added for Markdown and Code Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        :root {
+            --background-light: #f9fafb;
+            --text-light: #111827;
+            --sidebar-light: #f3f4f6;
+            --chat-bubble-user-light: #dbeafe;
+            --chat-bubble-ai-light: #e5e7eb;
+            --border-light: #d1d5db;
+            --input-bg-light: #ffffff;
+            --hover-light: #e5e7eb;
+            --code-bg-light: #f3f4f6;
+
+            --background-dark: #111827;
+            --text-dark: #f9fafb;
+            --sidebar-dark: #1f2937;
+            --chat-bubble-user-dark: #1e40af;
+            --chat-bubble-ai-dark: #374151;
+            --border-dark: #4b5563;
+            --input-bg-dark: #374151;
+            --hover-dark: #374151;
+            --code-bg-dark: #1f2937;
+        }
+        
+        html.light {
+            --background: var(--background-light);
+            --text-color: var(--text-light);
+            --sidebar-bg: var(--sidebar-light);
+            --chat-bubble-user-bg: var(--chat-bubble-user-light);
+            --chat-bubble-ai-bg: var(--chat-bubble-ai-light);
+            --border-color: var(--border-light);
+            --input-bg: var(--input-bg-light);
+            --hover-bg: var(--hover-light);
+            --code-bg: var(--code-bg-light);
+        }
+
+        html.dark {
+            --background: var(--background-dark);
+            --text-color: var(--text-dark);
+            --sidebar-bg: var(--sidebar-dark);
+            --chat-bubble-user-bg: var(--chat-bubble-user-dark);
+            --chat-bubble-ai-bg: var(--chat-bubble-ai-dark);
+            --border-color: var(--border-dark);
+            --input-bg: var(--input-bg-dark);
+            --hover-bg: var(--hover-dark);
+            --code-bg: var(--code-bg-dark);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-color);
+        }
+
+        #chat-history, #chat-messages, #settings-panel {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        #chat-history::-webkit-scrollbar, #chat-messages::-webkit-scrollbar, #settings-panel::-webkit-scrollbar { width: 6px; }
+        #chat-history::-webkit-scrollbar-thumb, #chat-messages::-webkit-scrollbar-thumb, #settings-panel::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+        
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        #sidebar.hidden-sidebar { transform: translateX(-100%); }
+        
+        .chat-bubble-wrapper { position: relative; }
+        .chat-bubble { max-width: 90%; word-wrap: break-word; }
+        .chat-actions { display: none; }
+        .chat-bubble-wrapper:hover .chat-actions { display: flex; }
+
+        .modal { transition: opacity 0.25s ease; }
+
+        /* Styles for rendered Markdown */
+        .prose { color: var(--text-color); }
+        .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 { color: var(--text-color); }
+        .prose a { color: #3b82f6; }
+        .prose strong { color: var(--text-color); }
+        .prose blockquote { border-left-color: var(--border-color); color: inherit; }
+        .prose code { background-color: var(--code-bg); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
+        .prose pre { background-color: var(--code-bg); padding: 1rem; border-radius: 0.5rem; position: relative; }
+        .prose pre code { background-color: transparent; padding: 0; }
+        .copy-code-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .prose pre:hover .copy-code-btn { opacity: 1; }
+
+        /* Custom Context Menu */
+        #context-menu {
+            position: absolute;
+            z-index: 1000;
+            width: 300px;
+            background-color: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 0.5rem;
+            display: none;
+        }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+    <div id="app-container" class="flex h-screen w-screen bg-[var(--background)] text-[var(--text-color)]">
+        
+        <!-- Generic Modal -->
+        <div id="generic-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 modal">
+            <div class="bg-[var(--sidebar-bg)] p-6 rounded-lg shadow-xl w-full max-w-md">
+                <h2 id="modal-title" class="text-xl font-bold mb-4">Notification</h2>
+                <p id="modal-message" class="mb-6 whitespace-pre-wrap"></p>
+                <div id="modal-content" class="mb-6 max-h-64 overflow-y-auto"></div>
+                <div id="modal-buttons" class="flex justify-end gap-4"></div>
+            </div>
+        </div>
+
+        <!-- Custom Context Menu for Models -->
+        <div id="context-menu">
+            <div class="p-2">
+                <h3 id="context-menu-title" class="font-semibold mb-2 text-sm">Model Persona</h3>
+                <textarea id="context-menu-prompt" rows="5" class="w-full text-sm p-2 rounded bg-[var(--input-bg)] border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., You are a helpful assistant that speaks like a pirate."></textarea>
+                <div class="flex justify-end gap-2 mt-2">
+                    <button id="context-menu-close" class="px-3 py-1 text-sm rounded bg-gray-500 text-white hover:bg-gray-600">Close</button>
+                    <button id="context-menu-save" class="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar (Chat History) -->
+        <aside id="sidebar" class="absolute lg:static top-0 left-0 h-full w-64 bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] flex flex-col z-40">
+            <div class="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
+                <h1 class="text-xl font-bold">Past Chats</h1>
+                <button id="new-chat-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]"><i data-lucide="file-plus-2"></i></button>
+            </div>
+            <div id="chat-history" class="flex-grow overflow-y-auto p-2"></div>
+            <div class="p-2 border-t border-[var(--border-color)] text-xs"><p class="font-semibold">Storage: Local</p></div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="flex-1 flex flex-col h-screen relative">
+            <header class="flex items-center justify-between p-4 border-b border-[var(--border-color)] bg-[var(--background)] w-full">
+                <div class="flex items-center gap-4">
+                    <button id="toggle-sidebar-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)] lg:hidden"><i data-lucide="panel-left"></i></button>
+                    <h2 id="chat-title" class="text-lg font-semibold">New Chat</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                     <button id="summarize-chat-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]" title="✨ Summarize Chat"><i data-lucide="sparkles"></i></button>
+                    <button id="toggle-settings-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]"><i data-lucide="settings"></i></button>
+                </div>
+            </header>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+
+            <div id="typing-indicator" class="hidden px-6 pb-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                    <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">AI is thinking...</span>
+                </div>
+            </div>
+
+            <div id="reply-suggestions" class="px-6 pb-2 flex flex-wrap gap-2"></div>
+
+            <div class="p-4 border-t border-[var(--border-color)] bg-[var(--background)]">
+                <form id="chat-form" class="flex items-center gap-4">
+                    <button type="button" id="suggest-reply-btn" class="p-3 rounded-lg hover:bg-[var(--hover-bg)]" title="✨ Suggest Reply"><i data-lucide="sparkles"></i></button>
+                    <textarea id="message-input" placeholder="Type your message or /imagine..." class="flex-1 p-3 rounded-lg bg-[var(--input-bg)] border border-[var(--border-color)] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" rows="1"></textarea>
+                    <button type="submit" class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"><i data-lucide="send-horizontal"></i></button>
+                </form>
+            </div>
+        </main>
+
+        <!-- Settings Panel -->
+        <aside id="settings-panel" class="hidden w-80 bg-[var(--sidebar-bg)] border-l border-[var(--border-color)] p-4 flex-col gap-6 overflow-y-auto">
+            <h2 class="text-xl font-bold">Settings</h2>
+            
+            <div>
+                <h3 class="font-semibold mb-2">Theme</h3>
+                <div class="flex items-center justify-between p-2 rounded-lg bg-[var(--input-bg)]">
+                    <span>Toggle Light/Dark</span>
+                    <button id="theme-toggle-btn" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200 dark:bg-gray-600 focus:outline-none">
+                        <span class="sr-only">Toggle theme</span>
+                        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1 dark:translate-x-6"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="font-semibold mb-2">AI Model</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Left-click to select, right-click for persona.</p>
+                <div id="model-list" class="space-y-2"></div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const OPENROUTER_API_KEY = "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"; // Your OpenRouter API key
+        const UNLOCK_CODE = "SpeedaBraker"; // Your unlock code
+        const ALL_MODELS = [
+            { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 0528 Qwen3 8B' },
+            { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct', locked: true },
+            { id: 'qwen/qwen3-32b:free', name: 'Qwen 3 32B', locked: true },
+            { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT', locked: true },
+            { id: 'meta-llama/llama-4-maverick:free', name: 'Meta Llama 4 Maverick', locked: true },
+            { id: 'microsoft/phi-4-reasoning-plus:free', name: 'Microsoft Phi-4 Reasoning Plus', locked: true },
+            { id: 'deepseek/deepseek-chat-v3-0324:free', name: 'DeepSeek Chat V3 0324', locked: true },
+            { id: 'qwen/qwen-2.5-coder-32b-instruct:free', name: 'Qwen 2.5 Coder 32B Instruct', locked: true },
+            { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash Experimental', locked: true },
+            { id: 'meta-llama/llama-3.1-8b-instruct:free', name: 'Meta Llama 3.1 8B Instruct', locked: true },
+            { id: 'google/gemma-3n-e4b-it:free', name: 'Google Gemma 3n 4B', locked: true },
+        ];
+        const INITIAL_UNLOCKED_MODELS = ALL_MODELS.filter(m => !m.locked).map(m => m.id);
+
+        // --- DOM ELEMENTS ---
+        const getEl = (id) => document.getElementById(id);
+        const sidebar = getEl('sidebar'), toggleSidebarBtn = getEl('toggle-sidebar-btn');
+        const settingsPanel = getEl('settings-panel'), toggleSettingsBtn = getEl('toggle-settings-btn');
+        const themeToggleBtn = getEl('theme-toggle-btn');
+        const chatHistoryContainer = getEl('chat-history'), chatMessagesContainer = getEl('chat-messages');
+        const chatTitle = getEl('chat-title'), chatForm = getEl('chat-form'), messageInput = getEl('message-input');
+        const newChatBtn = getEl('new-chat-btn'), modelListContainer = getEl('model-list');
+        const typingIndicator = getEl('typing-indicator'), summarizeChatBtn = getEl('summarize-chat-btn');
+        const suggestReplyBtn = getEl('suggest-reply-btn'), replySuggestionsContainer = getEl('reply-suggestions');
+        const genericModal = getEl('generic-modal'), modalTitle = getEl('modal-title'), modalMessage = getEl('modal-message');
+        const modalContent = getEl('modal-content'), modalButtons = getEl('modal-buttons');
+        const contextMenu = getEl('context-menu'), contextMenuTitle = getEl('context-menu-title');
+        const contextMenuPrompt = getEl('context-menu-prompt'), contextMenuSave = getEl('context-menu-save');
+        const contextMenuClose = getEl('context-menu-close');
+
+        // --- LOCAL STATE ---
+        let currentChatId = null;
+        let userSettings = {};
+        let allChats = {};
+        let isGenerating = false;
+        let contextModelId = null;
+
+        // --- LOCALSTORAGE & DATA HANDLING ---
+        const getFromStorage = (key, defaultValue) => {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        };
+        const saveToStorage = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+        function loadLocalData() {
+            userSettings = getFromStorage('aiChatSettings_v3', {
+                theme: 'dark',
+                selectedModel: ALL_MODELS[0].id,
+                unlockedModels: INITIAL_UNLOCKED_MODELS,
+                modelSettings: {}, // New: stores personas per model
+            });
+            allChats = getFromStorage('aiAllChats_v3', {});
+            currentChatId = getFromStorage('aiCurrentChatId_v3', null);
+
+            renderTheme(userSettings.theme);
+            renderModelList();
+            renderChatHistory();
+            loadChat(currentChatId);
+        }
+        
+        function updateSettings(newSettings) {
+            userSettings = { ...userSettings, ...newSettings };
+            saveToStorage('aiChatSettings_v3', userSettings);
+            renderTheme(userSettings.theme);
+            renderModelList();
+        }
+
+        function startNewChat() {
+            loadChat(null);
+        }
+
+        function loadChat(chatId) {
+            currentChatId = chatId;
+            saveToStorage('aiCurrentChatId_v3', chatId);
+            const chat = chatId ? allChats[chatId] : null;
+            if (chat) {
+                chatTitle.textContent = chat.title;
+            } else {
+                chatTitle.textContent = "New Chat";
+            }
+            renderMessages();
+            renderChatHistory();
+        }
+
+        function saveMessage(message, chatId, isStreaming = false) {
+            const targetChatId = chatId || currentChatId;
+            if (!targetChatId) {
+                const newChatId = `chat_${Date.now()}`;
+                const newChat = {
+                    id: newChatId,
+                    title: message.content.substring(0, 30) + '...',
+                    createdAt: new Date().toISOString(),
+                    messages: [message],
+                };
+                allChats[newChatId] = newChat;
+                currentChatId = newChatId;
+            } else {
+                const chat = allChats[targetChatId];
+                const lastMessage = chat.messages[chat.messages.length - 1];
+                if (isStreaming && lastMessage && lastMessage.role === 'assistant') {
+                    lastMessage.content += message.content;
+                } else {
+                    chat.messages.push(message);
+                }
+            }
+            saveToStorage('aiAllChats_v3', allChats);
+            saveToStorage('aiCurrentChatId_v3', currentChatId);
+            renderMessages();
+            renderChatHistory();
+        }
+
+        function deleteChat(chatId) {
+            showModal({
+                title: 'Delete Chat', message: 'Are you sure?',
+                buttons: [
+                    { text: 'Cancel' },
+                    { text: 'Delete', class: 'px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700', onClick: () => {
+                        delete allChats[chatId];
+                        saveToStorage('aiAllChats_v3', allChats);
+                        if (currentChatId === chatId) startNewChat();
+                        renderChatHistory();
+                    }}
+                ]
+            });
+        }
+        
+        function handleEdit(messageIndex) {
+            const chat = allChats[currentChatId];
+            if (!chat) return;
+            const originalContent = chat.messages[messageIndex].content;
+            
+            showModal({
+                title: 'Edit Message',
+                content: `<textarea id="edit-message-input" class="w-full h-40 p-2 rounded bg-[var(--input-bg)] border border-[var(--border-color)]">${originalContent}</textarea>`,
+                buttons: [
+                    { text: 'Cancel' },
+                    { text: 'Save & Resubmit', class: 'px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700', onClick: () => {
+                        const newContent = getEl('edit-message-input').value;
+                        chat.messages.splice(messageIndex);
+                        saveMessage({ role: 'user', content: newContent }, currentChatId);
+                        handleSendMessage(null, newContent);
+                    }}
+                ]
+            });
+        }
+        
+        function handleRegenerate(messageIndex) {
+            const chat = allChats[currentChatId];
+            if (!chat) return;
+            chat.messages.splice(messageIndex);
+            const lastUserMessage = chat.messages[chat.messages.length - 1].content;
+            handleSendMessage(null, lastUserMessage);
+        }
+
+        // --- MODAL & UI HELPERS ---
+        function showModal({ title, message, content, buttons }) {
+            modalTitle.textContent = title || 'Notification';
+            modalMessage.textContent = message || '';
+            modalMessage.style.display = message ? 'block' : 'none';
+            modalContent.innerHTML = content || '';
+            modalContent.style.display = content ? 'block' : 'none';
+            modalButtons.innerHTML = '';
+            if (buttons && buttons.length > 0) {
+                buttons.forEach(btn => {
+                    const buttonEl = document.createElement('button');
+                    buttonEl.textContent = btn.text;
+                    buttonEl.className = btn.class || 'px-4 py-2 rounded bg-gray-500 text-white hover:bg-gray-600';
+                    buttonEl.onclick = () => { hideModal(); if (btn.onClick) btn.onClick(); };
+                    modalButtons.appendChild(buttonEl);
+                });
+            } else {
+                const okButton = document.createElement('button');
+                okButton.textContent = 'OK';
+                okButton.className = 'px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700';
+                okButton.onclick = hideModal;
+                modalButtons.appendChild(okButton);
+            }
+            genericModal.classList.remove('hidden');
+            setTimeout(() => genericModal.style.opacity = 1, 10);
+        }
+        function hideModal() {
+            genericModal.style.opacity = 0;
+            setTimeout(() => genericModal.classList.add('hidden'), 250);
+        }
+        function showUnlockModal() {
+            showModal({
+                title: 'Unlock Models', message: 'Enter the code to unlock models.',
+                content: `<input type="text" id="unlock-code-input" class="w-full p-2 rounded bg-[var(--input-bg)] border border-[var(--border-color)]" placeholder="Enter code...">`,
+                buttons: [ { text: 'Cancel' }, { text: 'Unlock', class: 'px-4 py-2 rounded bg-blue-600 text-white', onClick: handleUnlockSubmit } ]
+            });
+        }
+        function handleUnlockSubmit() {
+            const code = getEl('unlock-code-input').value;
+            if (code.trim().toUpperCase() === UNLOCK_CODE.toUpperCase()) {
+                updateSettings({ unlockedModels: ALL_MODELS.map(m => m.id) });
+                showModal({ message: 'All models unlocked!' });
+            } else {
+                showModal({ message: 'Incorrect code.' });
+            }
+        }
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showModal({ message: 'Copied to clipboard!', title: ' '});
+                setTimeout(hideModal, 1000);
+            }, (err) => {
+                showModal({ message: `Failed to copy: ${err}` });
+            });
+        }
+
+        // --- CONTEXT MENU ---
+        function showContextMenu(event, modelId, modelName) {
+            event.preventDefault();
+            contextModelId = modelId;
+            contextMenu.style.display = 'block';
+            contextMenu.style.top = `${event.pageY}px`;
+            contextMenu.style.left = `${event.pageX}px`;
+            contextMenuTitle.textContent = `Persona for ${modelName}`;
+            contextMenuPrompt.value = userSettings.modelSettings[modelId] || '';
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+            contextModelId = null;
+        }
+
+        function saveContextMenu() {
+            if (contextModelId) {
+                const newModelSettings = { ...userSettings.modelSettings };
+                newModelSettings[contextModelId] = contextMenuPrompt.value;
+                updateSettings({ modelSettings: newModelSettings });
+            }
+            hideContextMenu();
+        }
+
+        // --- UI RENDERING ---
+        const renderTheme = (theme) => {
+            const html = document.documentElement;
+            html.classList.toggle('dark', theme === 'dark');
+            html.classList.toggle('light', theme !== 'dark');
+            getEl('theme-toggle-btn').querySelector('span:last-child').style.transform = theme === 'dark' ? 'translateX(1.5rem)' : 'translateX(0.25rem)';
+            const hljsTheme = getEl('hljs-theme');
+            if(hljsTheme) hljsTheme.remove();
+            const newThemeLink = document.createElement('link');
+            newThemeLink.id = 'hljs-theme';
+            newThemeLink.rel = 'stylesheet';
+            newThemeLink.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${theme === 'dark' ? 'github-dark' : 'github'}.min.css`;
+            document.head.appendChild(newThemeLink);
+        };
+
+        const renderModelList = () => {
+            modelListContainer.innerHTML = '';
+            const unlocked = userSettings.unlockedModels || [];
+            ALL_MODELS.forEach(model => {
+                const isUnlocked = unlocked.includes(model.id);
+                const isSelected = model.id === userSettings.selectedModel;
+                const modelItem = document.createElement('div');
+                modelItem.className = `model-item p-2 rounded-lg cursor-pointer flex items-center justify-between ${isSelected ? 'bg-blue-500 text-white' : 'hover:bg-[var(--hover-bg)]'} ${isUnlocked ? 'unlocked' : 'locked'}`;
+                modelItem.innerHTML = `<span>${model.name}</span><i data-lucide="lock" class="lock-icon w-4 h-4 text-gray-400"></i>`;
+                modelItem.onclick = () => isUnlocked ? updateSettings({ selectedModel: model.id }) : showUnlockModal();
+                modelItem.oncontextmenu = (e) => showContextMenu(e, model.id, model.name);
+                modelListContainer.appendChild(modelItem);
+            });
+            lucide.createIcons();
+        };
+
+        const renderChatHistory = () => {
+            chatHistoryContainer.innerHTML = '';
+            const chats = Object.values(allChats).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            if (chats.length === 0) {
+                chatHistoryContainer.innerHTML = '<p class="text-center text-sm text-gray-500 p-4">No chats yet.</p>';
+                return;
+            }
+            chats.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = `p-3 mb-2 rounded-lg cursor-pointer flex justify-between items-center ${chat.id === currentChatId ? 'bg-blue-500 text-white' : 'hover:bg-[var(--hover-bg)]'}`;
+                chatItem.innerHTML = `<span class="truncate">${chat.title}</span><button class="p-1 rounded-md hover:bg-red-500/50"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
+                chatItem.onclick = () => loadChat(chat.id);
+                chatItem.querySelector('button').onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
+                chatHistoryContainer.appendChild(chatItem);
+            });
+            lucide.createIcons();
+        };
+
+        const renderMessages = () => {
+            chatMessagesContainer.innerHTML = '';
+            replySuggestionsContainer.innerHTML = '';
+            const messages = currentChatId ? allChats[currentChatId]?.messages : [];
+
+            if (!messages || messages.length === 0) {
+                chatMessagesContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-gray-500"><i data-lucide="bot" class="w-24 h-24 mb-4"></i><h2 class="text-2xl font-bold">AI Chat</h2><p>Start a conversation by typing below.</p></div>`;
+                lucide.createIcons(); return;
+            }
+
+            messages.forEach((msg, index) => {
+                const isUser = msg.role === 'user';
+                const wrapper = document.createElement('div');
+                wrapper.className = `flex items-start gap-3 chat-bubble-wrapper ${isUser ? 'self-end flex-row-reverse' : 'self-start'}`;
+
+                const avatar = `<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isUser ? 'bg-blue-500' : 'bg-gray-500'}"><i data-lucide="${isUser ? 'user' : 'bot'}" class="w-5 h-5 text-white"></i></div>`;
+                
+                const bubble = document.createElement('div');
+                bubble.className = `p-3 rounded-lg chat-bubble ${isUser ? 'bg-[var(--chat-bubble-user-bg)]' : 'bg-[var(--chat-bubble-ai-bg)]'}`;
+                
+                if (msg.type === 'image') {
+                    bubble.innerHTML = `<img src="${msg.content}" alt="Generated Image" class="rounded-lg max-w-full">`;
+                } else {
+                    bubble.innerHTML = `<div class="prose">${marked.parse(msg.content || '')}</div>`;
+                }
+
+                const actions = document.createElement('div');
+                actions.className = 'chat-actions absolute -bottom-6 flex gap-2';
+                if (isUser) {
+                    actions.innerHTML = `<button class="p-1 rounded-md hover:bg-[var(--hover-bg)]" title="Edit & Resubmit"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
+                    actions.querySelector('button').onclick = () => handleEdit(index);
+                } else {
+                    actions.innerHTML = `<button class="p-1 rounded-md hover:bg-[var(--hover-bg)]" title="Regenerate"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>`;
+                    actions.querySelector('button').onclick = () => handleRegenerate(index);
+                }
+
+                wrapper.innerHTML = avatar;
+                wrapper.appendChild(bubble);
+                wrapper.appendChild(actions);
+                chatMessagesContainer.appendChild(wrapper);
+            });
+            
+            chatMessagesContainer.querySelectorAll('pre').forEach(pre => {
+                const code = pre.querySelector('code');
+                if (code) {
+                    hljs.highlightElement(code);
+                    const copyBtn = document.createElement('button');
+                    copyBtn.innerHTML = `<i data-lucide="copy" class="w-4 h-4"></i>`;
+                    copyBtn.className = 'copy-code-btn';
+                    copyBtn.onclick = () => copyToClipboard(code.textContent);
+                    pre.appendChild(copyBtn);
+                }
+            });
+
+            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+            lucide.createIcons();
+        };
+        
+        // --- API LOGIC ---
+        async function callGeminiAPI(prompt) {
+            const apiKey = ""; // Provided by environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error( (await response.json()).error.message );
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                showModal({ title: 'Gemini Feature Error', message: `${error}` });
+                return null;
+            }
+        }
+        
+        async function handleImageGeneration(prompt) {
+            isGenerating = true;
+            typingIndicator.classList.remove('hidden');
+            const apiKey = ""; // Provided by environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+            const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error( (await response.json()).error.message );
+                const result = await response.json();
+                const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                saveMessage({ role: 'assistant', type: 'image', content: imageUrl }, currentChatId);
+            } catch (error) {
+                console.error("Error generating image:", error);
+                showModal({ title: 'Image Generation Error', message: `${error}` });
+            } finally {
+                isGenerating = false;
+                typingIndicator.classList.add('hidden');
+            }
+        }
+
+        async function handleSendMessage(event, overridePrompt = null) {
+            if(event) event.preventDefault();
+            if (isGenerating) return;
+            
+            const userInput = overridePrompt || messageInput.value.trim();
+            if (!userInput) return;
+
+            if (!overridePrompt) {
+                 const userMessage = { role: 'user', content: userInput };
+                 if (!currentChatId) {
+                    saveMessage(userMessage);
+                 } else {
+                    saveMessage(userMessage, currentChatId);
+                 }
+            }
+            
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            replySuggestionsContainer.innerHTML = '';
+            
+            if (userInput.toLowerCase().startsWith('/imagine ')) {
+                handleImageGeneration(userInput.substring(8).trim());
+                return;
+            }
+
+            isGenerating = true;
+            typingIndicator.classList.remove('hidden');
+            
+            const messagesToSend = [...(allChats[currentChatId]?.messages || [])];
+            const modelPersona = userSettings.modelSettings[userSettings.selectedModel];
+            if (modelPersona) {
+                messagesToSend.unshift({ role: 'system', content: modelPersona });
+            }
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: userSettings.selectedModel,
+                        messages: messagesToSend.map(({role, content}) => ({role, content})),
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+                }
+                
+                saveMessage({ role: 'assistant', content: '' }, currentChatId);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6);
+                            if (data === '[DONE]') break;
+                            try {
+                                const json = JSON.parse(data);
+                                const content = json.choices[0].delta?.content || '';
+                                if (content) {
+                                    saveMessage({ role: 'assistant', content }, currentChatId, true);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing stream data:', e, data);
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error("Error calling OpenRouter:", error);
+                showModal({ title: 'Chat Error', message: `${error}` });
+                saveMessage({ role: 'assistant', content: `Sorry, an error occurred: ${error.message}`}, currentChatId);
+            } finally {
+                isGenerating = false;
+                typingIndicator.classList.add('hidden');
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        toggleSidebarBtn.onclick = () => sidebar.classList.toggle('hidden-sidebar');
+        toggleSettingsBtn.onclick = () => {
+            settingsPanel.classList.toggle('hidden');
+            settingsPanel.classList.toggle('flex');
+        };
+        themeToggleBtn.onclick = () => updateSettings({ theme: document.documentElement.classList.contains('dark') ? 'light' : 'dark' });
+        newChatBtn.onclick = startNewChat;
+        chatForm.onsubmit = handleSendMessage;
+        summarizeChatBtn.onclick = async () => {
+            const messages = allChats[currentChatId]?.messages || [];
+            if (messages.length < 2) return showModal({ message: "Not enough conversation to summarize." });
+            showModal({ title: '✨ Summarizing...', message: 'Please wait.'});
+            const summary = await callGeminiAPI(`Summarize this conversation:\n\n${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`);
+            if (summary) showModal({ title: '✨ Chat Summary', message: summary });
+        };
+        suggestReplyBtn.onclick = async () => {
+            const messages = allChats[currentChatId]?.messages || [];
+            const lastMessage = messages[messages.length - 1];
+            if (!lastMessage || lastMessage.role === 'user') return showModal({ message: "Can only suggest a reply to the AI's message." });
+            replySuggestionsContainer.innerHTML = `<span class="text-sm text-gray-500">✨ Thinking...</span>`;
+            const resultText = await callGeminiAPI(`Based on this message: "${lastMessage.content}", suggest three short replies for the user.`, true);
+            replySuggestionsContainer.innerHTML = '';
+            if (resultText) {
+                try {
+                    JSON.parse(resultText).suggestions.forEach(text => {
+                        const button = document.createElement('button');
+                        button.textContent = text;
+                        button.className = "px-3 py-1.5 text-sm border border-[var(--border-color)] rounded-full hover:bg-[var(--hover-bg)]";
+                        button.onclick = () => { messageInput.value = text; handleSendMessage(); };
+                        replySuggestionsContainer.appendChild(button);
+                    });
+                } catch (e) { console.error("Failed to parse suggestions:", e); }
+            }
+        };
+        messageInput.oninput = () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+        };
+        messageInput.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+        };
+        
+        // Context Menu Listeners
+        contextMenuSave.onclick = saveContextMenu;
+        contextMenuClose.onclick = hideContextMenu;
+        window.addEventListener('click', (e) => {
+            if (contextMenu.style.display === 'block' && !contextMenu.contains(e.target)) {
+                hideContextMenu();
+            }
+        });
+
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            lucide.createIcons();
+            loadLocalData();
+        };
+    </script>
+</body>
+</html>
