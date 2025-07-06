@@ -65,13 +65,13 @@
             color: var(--text-color);
         }
 
-        #chat-history, #chat-messages, #settings-panel {
+        #chat-history, #chat-messages, #settings-view {
             scrollbar-width: thin;
             scrollbar-color: var(--border-color) transparent;
         }
 
-        #chat-history::-webkit-scrollbar, #chat-messages::-webkit-scrollbar, #settings-panel::-webkit-scrollbar { width: 6px; }
-        #chat-history::-webkit-scrollbar-thumb, #chat-messages::-webkit-scrollbar-thumb, #settings-panel::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+        #chat-history::-webkit-scrollbar, #chat-messages::-webkit-scrollbar, #settings-view::-webkit-scrollbar { width: 6px; }
+        #chat-history::-webkit-scrollbar-thumb, #chat-messages::-webkit-scrollbar-thumb, #settings-view::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
         
         .chat-bubble-wrapper { position: relative; }
         .chat-bubble { max-width: 90%; word-wrap: break-word; }
@@ -147,14 +147,47 @@
             </div>
         </div>
 
-        <!-- Sidebar (Chat History) -->
-        <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] flex flex-col z-40 transform -translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
-            <div class="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
-                <h1 class="text-xl font-bold">Past Chats</h1>
-                <button id="new-chat-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]"><i data-lucide="file-plus-2"></i></button>
+        <!-- Unified Sidebar -->
+        <aside id="sidebar" class="fixed top-0 left-0 h-full w-80 max-w-[90vw] bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] flex flex-col z-40 transform -translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-80">
+            <!-- Tab Buttons -->
+            <div class="flex border-b border-[var(--border-color)] flex-shrink-0">
+                <button id="tab-btn-chats" class="flex-1 p-3 text-sm font-semibold">Chats</button>
+                <button id="tab-btn-settings" class="flex-1 p-3 text-sm font-semibold">Settings</button>
             </div>
-            <div id="chat-history" class="flex-grow overflow-y-auto p-2"></div>
-            <div class="p-2 border-t border-[var(--border-color)] text-xs"><p class="font-semibold">Storage: Local</p></div>
+
+            <!-- Tab Content -->
+            <div class="flex-grow overflow-y-auto">
+                <!-- Chats View -->
+                <div id="chats-view">
+                    <div class="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
+                        <h1 class="text-lg font-bold">Chat History</h1>
+                        <button id="new-chat-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]"><i data-lucide="file-plus-2"></i></button>
+                    </div>
+                    <div id="chat-history" class="p-2"></div>
+                </div>
+
+                <!-- Settings View -->
+                <div id="settings-view" class="hidden p-4 space-y-6">
+                    <h2 class="text-lg font-bold">Settings</h2>
+                    <div>
+                        <h3 class="font-semibold mb-2">Theme</h3>
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-[var(--input-bg)]">
+                            <span>Toggle Light/Dark</span>
+                            <button id="theme-toggle-btn" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200 dark:bg-gray-600 focus:outline-none">
+                                <span class="sr-only">Toggle theme</span>
+                                <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1 dark:translate-x-6"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2">AI Model</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Left-click to select, right-click for persona.</p>
+                        <div id="model-list" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-2 border-t border-[var(--border-color)] text-xs flex-shrink-0"><p class="font-semibold">Storage: Local</p></div>
         </aside>
 
         <!-- Main Chat Area -->
@@ -191,28 +224,6 @@
                 </form>
             </div>
         </main>
-
-        <!-- Settings Panel -->
-        <aside id="settings-panel" class="fixed top-0 right-0 h-full w-80 bg-[var(--sidebar-bg)] border-l border-[var(--border-color)] p-4 flex flex-col gap-6 z-40 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:hidden">
-            <h2 class="text-xl font-bold">Settings</h2>
-            
-            <div>
-                <h3 class="font-semibold mb-2">Theme</h3>
-                <div class="flex items-center justify-between p-2 rounded-lg bg-[var(--input-bg)]">
-                    <span>Toggle Light/Dark</span>
-                    <button id="theme-toggle-btn" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200 dark:bg-gray-600 focus:outline-none">
-                        <span class="sr-only">Toggle theme</span>
-                        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1 dark:translate-x-6"></span>
-                    </button>
-                </div>
-            </div>
-
-            <div>
-                <h3 class="font-semibold mb-2">AI Model</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Left-click to select, right-click for persona.</p>
-                <div id="model-list" class="space-y-2"></div>
-            </div>
-        </aside>
     </div>
 
     <script>
@@ -220,7 +231,7 @@
         const OPENROUTER_API_KEY = "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"; // Your OpenRouter API key
         const UNLOCK_CODE = "SpeedaBraker"; // Your unlock code
         const ALL_MODELS = [
-        { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 0528 Qwen3 8B' },
+            { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 0528 Qwen3 8B' },
             { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct', locked: true },
             { id: 'qwen/qwen3-32b:free', name: 'Qwen 3 32B', locked: true },
             { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT', locked: true },
@@ -237,7 +248,6 @@
         // --- DOM ELEMENTS ---
         const getEl = (id) => document.getElementById(id);
         const sidebar = getEl('sidebar'), toggleSidebarBtn = getEl('toggle-sidebar-btn');
-        const settingsPanel = getEl('settings-panel'), toggleSettingsBtn = getEl('toggle-settings-btn');
         const themeToggleBtn = getEl('theme-toggle-btn');
         const chatHistoryContainer = getEl('chat-history'), chatMessagesContainer = getEl('chat-messages');
         const chatTitle = getEl('chat-title'), chatForm = getEl('chat-form'), messageInput = getEl('message-input');
@@ -250,6 +260,9 @@
         const contextMenuPrompt = getEl('context-menu-prompt'), contextMenuSave = getEl('context-menu-save');
         const contextMenuClose = getEl('context-menu-close');
         const appOverlay = getEl('app-overlay');
+        const tabBtnChats = getEl('tab-btn-chats'), tabBtnSettings = getEl('tab-btn-settings');
+        const chatsView = getEl('chats-view'), settingsView = getEl('settings-view');
+        const toggleSettingsBtn = getEl('toggle-settings-btn');
 
         // --- LOCAL STATE ---
         let currentChatId = null;
@@ -263,27 +276,66 @@
             const item = localStorage.getItem(key);
             return item ? JSON.parse(item) : defaultValue;
         };
-        const saveToStorage = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+        
+        function saveChatsToStorage() {
+            const chatsToStore = JSON.parse(JSON.stringify(allChats));
+            for (const chatId in chatsToStore) {
+                chatsToStore[chatId].messages = chatsToStore[chatId].messages.map(msg => {
+                    if (msg.type === 'image' && msg.content.startsWith('blob:')) {
+                        return { ...msg, content: '[Generated Image (session only)]' };
+                    }
+                    return msg;
+                });
+            }
+            try {
+                localStorage.setItem('aiAllChats_v4', JSON.stringify(chatsToStore));
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showModal({
+                        title: 'Storage Error',
+                        message: 'Local storage is full. Could not save the chat. Please clear some old chats to free up space.'
+                    });
+                    console.error('Storage quota exceeded.');
+                } else {
+                    console.error('Failed to save chats to storage:', e);
+                }
+            }
+        }
+
+        function saveToStorage(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (e) {
+                 if (e.name === 'QuotaExceededError') {
+                    showModal({
+                        title: 'Storage Error',
+                        message: 'Local storage is full. Could not save settings. Please clear some old chats to free up space.'
+                    });
+                 }
+            }
+        }
 
         function loadLocalData() {
-            userSettings = getFromStorage('aiChatSettings_v3', {
+            userSettings = getFromStorage('aiChatSettings_v4', {
                 theme: 'dark',
                 selectedModel: ALL_MODELS[0].id,
                 unlockedModels: INITIAL_UNLOCKED_MODELS,
                 modelSettings: {},
+                activeSidebarTab: 'chats',
             });
-            allChats = getFromStorage('aiAllChats_v3', {});
-            currentChatId = getFromStorage('aiCurrentChatId_v3', null);
+            allChats = getFromStorage('aiAllChats_v4', {});
+            currentChatId = getFromStorage('aiCurrentChatId_v4', null);
 
             renderTheme(userSettings.theme);
             renderModelList();
             renderChatHistory();
             loadChat(currentChatId);
+            switchSidebarTab(userSettings.activeSidebarTab);
         }
         
         function updateSettings(newSettings) {
             userSettings = { ...userSettings, ...newSettings };
-            saveToStorage('aiChatSettings_v3', userSettings);
+            saveToStorage('aiChatSettings_v4', userSettings);
             renderTheme(userSettings.theme);
             renderModelList();
         }
@@ -294,13 +346,9 @@
 
         function loadChat(chatId) {
             currentChatId = chatId;
-            saveToStorage('aiCurrentChatId_v3', chatId);
+            saveToStorage('aiCurrentChatId_v4', chatId);
             const chat = chatId ? allChats[chatId] : null;
-            if (chat) {
-                chatTitle.textContent = chat.title;
-            } else {
-                chatTitle.textContent = "New Chat";
-            }
+            chatTitle.textContent = chat ? chat.title : "New Chat";
             renderMessages();
             renderChatHistory();
         }
@@ -326,8 +374,8 @@
                     chat.messages.push(message);
                 }
             }
-            saveToStorage('aiAllChats_v3', allChats);
-            saveToStorage('aiCurrentChatId_v3', currentChatId);
+            saveChatsToStorage();
+            saveToStorage('aiCurrentChatId_v4', currentChatId);
             renderMessages();
             renderChatHistory();
         }
@@ -339,7 +387,7 @@
                     { text: 'Cancel' },
                     { text: 'Delete', class: 'px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700', onClick: () => {
                         delete allChats[chatId];
-                        saveToStorage('aiAllChats_v3', allChats);
+                        saveChatsToStorage();
                         if (currentChatId === chatId) startNewChat();
                         renderChatHistory();
                     }}
@@ -455,7 +503,26 @@
             hideContextMenu();
         }
 
-        // --- UI RENDERING ---
+        // --- UI RENDERING & SIDEBAR LOGIC ---
+        function switchSidebarTab(tabName) {
+            if (tabName === 'chats') {
+                chatsView.style.display = 'block';
+                settingsView.style.display = 'none';
+                tabBtnChats.classList.add('border-b-2', 'border-blue-500');
+                tabBtnChats.classList.remove('text-gray-500');
+                tabBtnSettings.classList.remove('border-b-2', 'border-blue-500');
+                tabBtnSettings.classList.add('text-gray-500');
+            } else { // settings
+                chatsView.style.display = 'none';
+                settingsView.style.display = 'block';
+                tabBtnSettings.classList.add('border-b-2', 'border-blue-500');
+                tabBtnSettings.classList.remove('text-gray-500');
+                tabBtnChats.classList.remove('border-b-2', 'border-blue-500');
+                tabBtnChats.classList.add('text-gray-500');
+            }
+            updateSettings({ activeSidebarTab: tabName });
+        }
+
         const renderTheme = (theme) => {
             const html = document.documentElement;
             html.classList.toggle('dark', theme === 'dark');
@@ -531,7 +598,11 @@
                 bubble.className = `p-3 rounded-lg chat-bubble ${isUser ? 'bg-[var(--chat-bubble-user-bg)]' : 'bg-[var(--chat-bubble-ai-bg)]'}`;
                 
                 if (msg.type === 'image') {
-                    bubble.innerHTML = `<img src="${msg.content}" alt="Generated Image" class="rounded-lg max-w-full">`;
+                    if (msg.content.startsWith('blob:')) {
+                        bubble.innerHTML = `<img src="${msg.content}" alt="Generated Image" class="rounded-lg max-w-full">`;
+                    } else {
+                        bubble.innerHTML = `<div class="p-4 text-center text-gray-500 italic">${msg.content}</div>`;
+                    }
                 } else {
                     bubble.innerHTML = `<div class="prose">${marked.parse(msg.content || '')}</div>`;
                 }
@@ -569,6 +640,21 @@
         };
         
         // --- API LOGIC ---
+        const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
+            const byteCharacters = atob(b64Data);
+            const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+                const slice = byteCharacters.slice(offset, offset + sliceSize);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) {
+                    byteNumbers[i] = slice.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                byteArrays.push(byteArray);
+            }
+            return new Blob(byteArrays, {type: contentType});
+        };
+
         async function callGeminiAPI(prompt) {
             const apiKey = ""; // Provided by environment
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
@@ -595,7 +681,9 @@
                 const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!response.ok) throw new Error( (await response.json()).error.message );
                 const result = await response.json();
-                const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                const base64Data = result.predictions[0].bytesBase64Encoded;
+                const imageBlob = b64toBlob(base64Data, 'image/png');
+                const imageUrl = URL.createObjectURL(imageBlob);
                 saveMessage({ role: 'assistant', type: 'image', content: imageUrl }, currentChatId);
             } catch (error) {
                 console.error("Error generating image:", error);
@@ -697,21 +785,16 @@
             appOverlay.classList.toggle('hidden');
         };
         toggleSettingsBtn.onclick = () => {
-            if (window.innerWidth < 1024) {
-                settingsPanel.classList.remove('lg:hidden');
-                settingsPanel.classList.toggle('translate-x-full');
-                appOverlay.classList.toggle('hidden');
-            } else {
-                settingsPanel.classList.toggle('lg:hidden');
-            }
+            switchSidebarTab('settings');
+            sidebar.classList.remove('-translate-x-full');
+            appOverlay.classList.remove('hidden');
         };
         appOverlay.onclick = () => {
             sidebar.classList.add('-translate-x-full');
-            if (window.innerWidth < 1024) {
-                settingsPanel.classList.add('translate-x-full');
-            }
             appOverlay.classList.add('hidden');
         };
+        tabBtnChats.onclick = () => switchSidebarTab('chats');
+        tabBtnSettings.onclick = () => switchSidebarTab('settings');
         themeToggleBtn.onclick = () => updateSettings({ theme: document.documentElement.classList.contains('dark') ? 'light' : 'dark' });
         newChatBtn.onclick = startNewChat;
         chatForm.onsubmit = handleSendMessage;
