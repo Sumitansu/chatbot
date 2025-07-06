@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chatbot</title>
+    <title>AI Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Added for Markdown and Code Highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <style>
@@ -73,9 +73,6 @@
         #chat-history::-webkit-scrollbar, #chat-messages::-webkit-scrollbar, #settings-panel::-webkit-scrollbar { width: 6px; }
         #chat-history::-webkit-scrollbar-thumb, #chat-messages::-webkit-scrollbar-thumb, #settings-panel::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
         
-        #sidebar { transition: transform 0.3s ease-in-out; }
-        #sidebar.hidden-sidebar { transform: translateX(-100%); }
-        
         .chat-bubble-wrapper { position: relative; }
         .chat-bubble { max-width: 90%; word-wrap: break-word; }
         .chat-actions { display: none; }
@@ -123,8 +120,11 @@
 </head>
 <body class="overflow-hidden">
 
-    <div id="app-container" class="flex h-screen w-screen bg-[var(--background)] text-[var(--text-color)]">
+    <div id="app-container" class="relative flex h-screen w-screen bg-[var(--background)] text-[var(--text-color)] overflow-hidden">
         
+        <!-- Mobile Overlay -->
+        <div id="app-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"></div>
+
         <!-- Generic Modal -->
         <div id="generic-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 modal">
             <div class="bg-[var(--sidebar-bg)] p-6 rounded-lg shadow-xl w-full max-w-md">
@@ -148,7 +148,7 @@
         </div>
 
         <!-- Sidebar (Chat History) -->
-        <aside id="sidebar" class="absolute lg:static top-0 left-0 h-full w-64 bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] flex flex-col z-40">
+        <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] flex flex-col z-40 transform -translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
             <div class="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
                 <h1 class="text-xl font-bold">Past Chats</h1>
                 <button id="new-chat-btn" class="p-2 rounded-md hover:bg-[var(--hover-bg)]"><i data-lucide="file-plus-2"></i></button>
@@ -193,7 +193,7 @@
         </main>
 
         <!-- Settings Panel -->
-        <aside id="settings-panel" class="hidden w-80 bg-[var(--sidebar-bg)] border-l border-[var(--border-color)] p-4 flex-col gap-6 overflow-y-auto">
+        <aside id="settings-panel" class="fixed top-0 right-0 h-full w-80 bg-[var(--sidebar-bg)] border-l border-[var(--border-color)] p-4 flex flex-col gap-6 z-40 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:hidden">
             <h2 class="text-xl font-bold">Settings</h2>
             
             <div>
@@ -220,7 +220,7 @@
         const OPENROUTER_API_KEY = "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"; // Your OpenRouter API key
         const UNLOCK_CODE = "SpeedaBraker"; // Your unlock code
         const ALL_MODELS = [
-            { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 0528 Qwen3 8B' },
+        { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 0528 Qwen3 8B' },
             { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct', locked: true },
             { id: 'qwen/qwen3-32b:free', name: 'Qwen 3 32B', locked: true },
             { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT', locked: true },
@@ -249,6 +249,7 @@
         const contextMenu = getEl('context-menu'), contextMenuTitle = getEl('context-menu-title');
         const contextMenuPrompt = getEl('context-menu-prompt'), contextMenuSave = getEl('context-menu-save');
         const contextMenuClose = getEl('context-menu-close');
+        const appOverlay = getEl('app-overlay');
 
         // --- LOCAL STATE ---
         let currentChatId = null;
@@ -269,7 +270,7 @@
                 theme: 'dark',
                 selectedModel: ALL_MODELS[0].id,
                 unlockedModels: INITIAL_UNLOCKED_MODELS,
-                modelSettings: {}, // New: stores personas per model
+                modelSettings: {},
             });
             allChats = getFromStorage('aiAllChats_v3', {});
             currentChatId = getFromStorage('aiCurrentChatId_v3', null);
@@ -496,7 +497,13 @@
                 const chatItem = document.createElement('div');
                 chatItem.className = `p-3 mb-2 rounded-lg cursor-pointer flex justify-between items-center ${chat.id === currentChatId ? 'bg-blue-500 text-white' : 'hover:bg-[var(--hover-bg)]'}`;
                 chatItem.innerHTML = `<span class="truncate">${chat.title}</span><button class="p-1 rounded-md hover:bg-red-500/50"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
-                chatItem.onclick = () => loadChat(chat.id);
+                chatItem.onclick = () => {
+                    loadChat(chat.id);
+                    if (window.innerWidth < 1024) {
+                        sidebar.classList.add('-translate-x-full');
+                        appOverlay.classList.add('hidden');
+                    }
+                };
                 chatItem.querySelector('button').onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
                 chatHistoryContainer.appendChild(chatItem);
             });
@@ -685,10 +692,25 @@
         }
 
         // --- EVENT LISTENERS ---
-        toggleSidebarBtn.onclick = () => sidebar.classList.toggle('hidden-sidebar');
+        toggleSidebarBtn.onclick = () => {
+            sidebar.classList.toggle('-translate-x-full');
+            appOverlay.classList.toggle('hidden');
+        };
         toggleSettingsBtn.onclick = () => {
-            settingsPanel.classList.toggle('hidden');
-            settingsPanel.classList.toggle('flex');
+            if (window.innerWidth < 1024) {
+                settingsPanel.classList.remove('lg:hidden');
+                settingsPanel.classList.toggle('translate-x-full');
+                appOverlay.classList.toggle('hidden');
+            } else {
+                settingsPanel.classList.toggle('lg:hidden');
+            }
+        };
+        appOverlay.onclick = () => {
+            sidebar.classList.add('-translate-x-full');
+            if (window.innerWidth < 1024) {
+                settingsPanel.classList.add('translate-x-full');
+            }
+            appOverlay.classList.add('hidden');
         };
         themeToggleBtn.onclick = () => updateSettings({ theme: document.documentElement.classList.contains('dark') ? 'light' : 'dark' });
         newChatBtn.onclick = startNewChat;
